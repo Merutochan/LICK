@@ -3,6 +3,8 @@
 -- simple LIVECODING environment for Löve
 -- overwrites love.run, pressing all errors to the terminal/console
 
+-- added modification to close UDP thread if present
+
 local lick = {}
 lick.file = "main.lua"
 lick.debug = false
@@ -11,6 +13,8 @@ lick.clearFlag = false
 lick.sleepTime = love.graphics.newCanvas and 0.001 or 1
 
 local last_modified = 0
+socket = {}
+socket.UDP_thread = nil
 
 local function handle(err)
   return "ERROR: " .. err
@@ -25,6 +29,8 @@ local function update(dt)
     local info = love.filesystem.getInfo(lick.file)
     if info and last_modified < info.modtime then
         last_modified = info.modtime
+		-- Close UDP socket and thread
+		closeUDPThread()
         success, chunk = pcall(love.filesystem.load, lick.file)
         if not success then
             print(tostring(chunk))
@@ -132,6 +138,19 @@ function love.run()
     if love.timer then love.timer.sleep(lick.sleepTime) end
     if love.graphics then love.graphics.present() end
   end
+end
+
+function closeUDPThread()
+	-- If there is a "UDP_thread"
+	if socket.UDP_thread then
+		print("[LICK] - Closing UDP thread...")
+		assert(love.thread.getChannel("UDP_REQUEST"):push("quit"))
+		resp = love.thread.getChannel("UDP_SYSTEM_INFO"):demand()
+		if resp == "clear" then
+			socket.UDP_thread:release()
+			print("[LICK] - UDP Thread released.")
+		end
+	end
 end
 
 return lick
